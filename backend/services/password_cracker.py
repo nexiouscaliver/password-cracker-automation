@@ -10,16 +10,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-
 class PasswordCracker:
     """
     Encapsulates various password cracking techniques along with progress tracking.
+    Provides two execution modes:
+      - Short-circuit mode (default): stops after one method finds the password.
+      - Full mode: runs every technique to assess the overall strength.
     """
 
     def __init__(self, hash_value, algorithm="sha256", max_length=4, custom_dictionary=None, custom_rules=None):
         """
-        Initialize the PasswordCracker instance.
-
         :param hash_value: The hashed password to crack.
         :param algorithm: The hashing algorithm used (default: "sha256").
         :param max_length: Maximum length for brute-force attempts.
@@ -31,7 +31,7 @@ class PasswordCracker:
         self.max_length = max_length
         self.custom_dictionary = custom_dictionary
         self.custom_rules = custom_rules
-        self.found_password = None  # Once a method finds the password, set it here.
+        self.found_password = None  # Updated in short-circuit mode.
         self.progress = {
             "total_techniques": 10,
             "completed_techniques": 0,
@@ -51,17 +51,15 @@ class PasswordCracker:
         }
 
     def hash_match(self, guess):
-        """
-        Check whether the guess, when hashed, matches the target hash.
-        """
+        """Check if the hash of the guess matches the target hash."""
         try:
             hasher = getattr(hashlib, self.algorithm)
         except AttributeError:
             raise ValueError(f"Unsupported hash algorithm: {self.algorithm}")
         return hasher(guess.encode()).hexdigest() == self.hash_value
 
-    def dictionary_attack(self):
-        if self.found_password is not None:
+    def dictionary_attack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Dictionary attack skipped; password already found.")
             self.progress["results"]["dictionary_attack"] = self.found_password
             return self.found_password
@@ -69,63 +67,66 @@ class PasswordCracker:
         common_passwords = self.custom_dictionary if self.custom_dictionary else [
             "password", "123456", "123456789", "qwerty"
         ]
+        result = "Failed"
         for candidate in common_passwords:
             if self.hash_match(candidate):
+                result = candidate
                 logging.info(f"Dictionary attack found password: {candidate}")
-                self.found_password = candidate
-                self.progress["results"]["dictionary_attack"] = candidate
-                return candidate
-        logging.info("Dictionary attack failed.")
-        self.progress["results"]["dictionary_attack"] = "Failed"
-        return "Failed"
+                break
+        self.progress["results"]["dictionary_attack"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def rainbow_table_lookup(self):
-        if self.found_password is not None:
+    def rainbow_table_lookup(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Rainbow table lookup skipped; password already found.")
             self.progress["results"]["rainbow_table"] = self.found_password
             return self.found_password
         logging.info("Starting rainbow table lookup.")
+        result = "Failed"
         if self.algorithm == "md5":
             rainbow_table = {
                 "5f4dcc3b5aa765d61d8327deb882cf99": "password",
                 "e99a18c428cb38d5f260853678922e03": "abc123",
             }
-            result = rainbow_table.get(self.hash_value)
-            if result:
+            result = rainbow_table.get(self.hash_value, "Failed")
+            if result != "Failed":
                 logging.info(f"Rainbow table lookup found password: {result}")
-                self.found_password = result
-                self.progress["results"]["rainbow_table"] = result
-                return result
-        logging.info("Rainbow table lookup failed.")
-        self.progress["results"]["rainbow_table"] = "Failed"
-        return "Failed"
+        self.progress["results"]["rainbow_table"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def hybrid_attack(self):
-        if self.found_password is not None:
+    def hybrid_attack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Hybrid attack skipped; password already found.")
             self.progress["results"]["hybrid_attack"] = self.found_password
             return self.found_password
         logging.info("Starting hybrid attack.")
-        # Instead of using dictionary_attack()'s result, loop over all dictionary candidates.
+        result = "Failed"
         candidates = self.custom_dictionary if self.custom_dictionary else ["password", "123456", "admin"]
         for base in candidates:
             for i in range(100):
                 guess = base + str(i)
                 if self.hash_match(guess):
+                    result = guess
                     logging.info(f"Hybrid attack found password: {guess}")
-                    self.found_password = guess
-                    self.progress["results"]["hybrid_attack"] = guess
-                    return guess
-        logging.info("Hybrid attack failed.")
-        self.progress["results"]["hybrid_attack"] = "Failed"
-        return "Failed"
+                    break
+            if result != "Failed":
+                break
+        self.progress["results"]["hybrid_attack"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def rule_based_attack(self):
-        if self.found_password is not None:
+    def rule_based_attack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Rule-based attack skipped; password already found.")
             self.progress["results"]["rule_based_attack"] = self.found_password
             return self.found_password
         logging.info("Starting rule-based attack.")
+        result = "Failed"
         rules = self.custom_rules if self.custom_rules else {'a': '@', 'o': '0'}
         candidates = self.custom_dictionary if self.custom_dictionary else ["password", "admin", "welcome"]
         for word in candidates:
@@ -133,91 +134,95 @@ class PasswordCracker:
             for key, val in rules.items():
                 mutated = mutated.replace(key, val)
             if self.hash_match(mutated):
+                result = mutated
                 logging.info(f"Rule-based attack found password: {mutated}")
-                self.found_password = mutated
-                self.progress["results"]["rule_based_attack"] = mutated
-                return mutated
-        logging.info("Rule-based attack failed.")
-        self.progress["results"]["rule_based_attack"] = "Failed"
-        return "Failed"
+                break
+        self.progress["results"]["rule_based_attack"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def mask_attack(self):
-        if self.found_password is not None:
+    def mask_attack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Mask attack skipped; password already found.")
             self.progress["results"]["mask_attack"] = self.found_password
             return self.found_password
         logging.info("Starting mask attack.")
-        # A fixed pattern simulation.
+        result = "Failed"
         for mid in ["", "b", "B", "c", "C"]:
             guess = "A" + mid + "123"
             if self.hash_match(guess):
+                result = guess
                 logging.info(f"Mask attack found password: {guess}")
-                self.found_password = guess
-                self.progress["results"]["mask_attack"] = guess
-                return guess
-        logging.info("Mask attack failed.")
-        self.progress["results"]["mask_attack"] = "Failed"
-        return "Failed"
+                break
+        self.progress["results"]["mask_attack"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def markov_chain_attack(self):
-        if self.found_password is not None:
+    def markov_chain_attack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Markov chain attack skipped; password already found.")
             self.progress["results"]["markov_chain_attack"] = self.found_password
             return self.found_password
         logging.info("Starting Markov chain attack.")
+        result = "Failed"
         probable_guesses = ["password", "passw0rd", "pass1234"]
         for guess in probable_guesses:
             if self.hash_match(guess):
+                result = guess
                 logging.info(f"Markov chain attack found password: {guess}")
-                self.found_password = guess
-                self.progress["results"]["markov_chain_attack"] = guess
-                return guess
-        logging.info("Markov chain attack failed.")
-        self.progress["results"]["markov_chain_attack"] = "Failed"
-        return "Failed"
+                break
+        self.progress["results"]["markov_chain_attack"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def phonetic_attack(self):
-        if self.found_password is not None:
+    def phonetic_attack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Phonetic attack skipped; password already found.")
             self.progress["results"]["phonetic_attack"] = self.found_password
             return self.found_password
         logging.info("Starting phonetic attack.")
+        result = "Failed"
         phonetic_guesses = ["password", "passwurd", "pazzword"]
         for guess in phonetic_guesses:
             if self.hash_match(guess):
+                result = guess
                 logging.info(f"Phonetic attack found password: {guess}")
-                self.found_password = guess
-                self.progress["results"]["phonetic_attack"] = guess
-                return guess
-        logging.info("Phonetic attack failed.")
-        self.progress["results"]["phonetic_attack"] = "Failed"
-        return "Failed"
+                break
+        self.progress["results"]["phonetic_attack"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def ml_guessing(self):
-        if self.found_password is not None:
+    def ml_guessing(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Machine learning guessing skipped; password already found.")
             self.progress["results"]["ml_guessing"] = self.found_password
             return self.found_password
         logging.info("Starting machine learning guessing attack.")
+        result = "Failed"
         ml_guesses = ["password", "123456", "qwerty"]
         for guess in ml_guesses:
             if self.hash_match(guess):
+                result = guess
                 logging.info(f"Machine learning guessing found password: {guess}")
-                self.found_password = guess
-                self.progress["results"]["ml_guessing"] = guess
-                return guess
-        logging.info("Machine learning guessing attack failed.")
-        self.progress["results"]["ml_guessing"] = "Failed"
-        return "Failed"
+                break
+        self.progress["results"]["ml_guessing"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def brute_force_crack(self):
-        if self.found_password is not None:
+    def brute_force_crack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Brute force attack skipped; password already found.")
             self.progress["results"]["brute_force"] = self.found_password
             return self.found_password
         logging.info("Starting brute force attack.")
+        result = "Failed"
         chars = string.ascii_letters + string.digits
-        # To avoid heavy computation, if max_length is too high, skip brute force.
+        # To avoid excessive computation, skip if max_length is high.
         if self.max_length > 4:
             logging.info("Brute force attack skipped due to high max_length.")
             self.progress["results"]["brute_force"] = "Skipped"
@@ -231,40 +236,43 @@ class PasswordCracker:
                     futures[future] = guess
                 for future in as_completed(futures):
                     if future.result():
-                        found = futures[future]
-                        logging.info(f"Brute force found password: {found}")
-                        self.found_password = found
-                        self.progress["results"]["brute_force"] = found
-                        return found
-        logging.info("Brute force attack failed.")
-        self.progress["results"]["brute_force"] = "Failed"
-        return "Failed"
+                        result = futures[future]
+                        logging.info(f"Brute force found password: {result}")
+                        break
+            if result != "Failed":
+                break
+        self.progress["results"]["brute_force"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
-    def combinator_attack(self):
-        if self.found_password is not None:
+    def combinator_attack(self, allow_short_circuit=True):
+        if allow_short_circuit and self.found_password is not None:
             logging.info("Combinator attack skipped; password already found.")
             self.progress["results"]["combinator_attack"] = self.found_password
             return self.found_password
         logging.info("Starting combinator attack.")
+        result = "Failed"
         dict1 = self.custom_dictionary if self.custom_dictionary else ["password", "admin"]
         dict2 = ["123", "1234", "12345"]
         for word1 in dict1:
             for word2 in dict2:
                 guess = word1 + word2
                 if self.hash_match(guess):
+                    result = guess
                     logging.info(f"Combinator attack found password: {guess}")
-                    self.found_password = guess
-                    self.progress["results"]["combinator_attack"] = guess
-                    return guess
-        logging.info("Combinator attack failed.")
-        self.progress["results"]["combinator_attack"] = "Failed"
-        return "Failed"
+                    break
+            if result != "Failed":
+                break
+        self.progress["results"]["combinator_attack"] = result
+        if allow_short_circuit and result != "Failed":
+            self.found_password = result
+        return result
 
     def run_all_methods(self):
         """
-        Execute all cracking techniques sequentially.
-        The techniques are reordered so that the fast methods run first;
-        once any method finds the password, subsequent methods simply return the found password.
+        Execute all techniques in short-circuit mode (stops once a technique finds the password).
+        Techniques are run in an order favoring faster methods.
         """
         techniques = [
             ("dictionary_attack", self.dictionary_attack),
@@ -282,7 +290,7 @@ class PasswordCracker:
             start_time = time.time()
             logging.info(f"Starting technique: {name}")
             try:
-                result = method()
+                result = method(allow_short_circuit=True)
             except Exception as e:
                 logging.error(f"Error in {name}: {e}")
                 result = "Error"
@@ -290,25 +298,86 @@ class PasswordCracker:
             logging.info(f"Technique '{name}' completed in {end_time - start_time:.2f} seconds with result: {result}")
             self.progress["completed_techniques"] += 1
             self.progress["remaining_techniques"] = self.progress["total_techniques"] - self.progress["completed_techniques"]
+            if self.found_password is not None:
+                break
         return self.progress
+
+    def run_all_methods_full(self):
+        """
+        Execute all techniques independently (full mode) to provide a complete analysis.
+        Returns a dictionary with:
+          - technique_details: A mapping from technique name to its result and duration.
+          - strength_rating: A computed rating based on how many techniques succeeded.
+        """
+        technique_details = {}
+        # Save current found_password and reset for full independent runs.
+        original_found = self.found_password
+        self.found_password = None
+
+        techniques = {
+            "dictionary_attack": self.dictionary_attack,
+            "rainbow_table": self.rainbow_table_lookup,
+            "hybrid_attack": self.hybrid_attack,
+            "rule_based_attack": self.rule_based_attack,
+            "mask_attack": self.mask_attack,
+            "markov_chain_attack": self.markov_chain_attack,
+            "phonetic_attack": self.phonetic_attack,
+            "ml_guessing": self.ml_guessing,
+            "combinator_attack": self.combinator_attack,
+            "brute_force": self.brute_force_crack
+        }
+        for name, method in techniques.items():
+            start_time = time.time()
+            try:
+                result = method(allow_short_circuit=False)
+            except Exception as e:
+                logging.error(f"Error in {name}: {e}")
+                result = "Error"
+            end_time = time.time()
+            duration = end_time - start_time
+            technique_details[name] = {"result": result, "duration": duration}
+            logging.info(f"Technique '{name}' took {duration:.2f} seconds and returned: {result}")
+
+        # Restore original found_password.
+        self.found_password = original_found
+
+        # Compute strength rating based on the number of techniques that succeeded.
+        successes = sum(1 for details in technique_details.values() if details["result"] not in ["Failed", "Skipped", "Error"])
+        if successes == 0:
+            strength_rating = "Very Strong"
+        elif successes <= 2:
+            strength_rating = "Strong"
+        elif successes <= 4:
+            strength_rating = "Moderate"
+        elif successes <= 7:
+            strength_rating = "Weak"
+        else:
+            strength_rating = "Very Weak"
+
+        analysis = {
+            "technique_details": technique_details,
+            "strength_rating": strength_rating
+        }
+        return analysis
 
     def get_progress(self):
-        """Return current progress as a JSON-compatible dictionary."""
+        """Return the progress tracking dictionary."""
         return self.progress
-
 
 def crack_password(hash_value, algorithm="sha256", method="all", extra_data=None):
     """
-    Wrapper function to crack a given hash using a specified technique.
-
+    Wrapper to crack a hash using a specified method.
+    
     :param hash_value: The hash value to crack.
-    :param algorithm: The hashing algorithm used (e.g., "md5", "sha256").
-    :param method: The technique to use; one of:
+    :param algorithm: The hashing algorithm used.
+    :param method: The technique to use. Options:
                    "brute_force", "dictionary_attack", "rainbow_table", "hybrid_attack",
                    "rule_based_attack", "mask_attack", "markov_chain_attack", "phonetic_attack",
-                   "ml_guessing", "combinator_attack", or "all".
+                   "ml_guessing", "combinator_attack", "all" (short-circuit mode),
+                   or "all_full" (full analysis mode).
     :param extra_data: Optional configuration (e.g., custom_dictionary, custom_rules, max_length).
-    :return: A dictionary with keys "result" (detailed progress) and "final_password" (the found password or a failure message).
+    :return: If method is "all" or "all_full", returns the progress or analysis dictionary.
+             Otherwise, returns a dictionary with "result" (progress details) and "final_password".
     """
     custom_dictionary = extra_data.get("custom_dictionary") if extra_data else None
     custom_rules = extra_data.get("custom_rules") if extra_data else None
@@ -334,10 +403,14 @@ def crack_password(hash_value, algorithm="sha256", method="all", extra_data=None
         "ml_guessing": cracker.ml_guessing,
         "combinator_attack": cracker.combinator_attack,
         "all": cracker.run_all_methods,
+        "all_full": cracker.run_all_methods_full
     }
 
     if method not in technique_mapping:
         raise ValueError("Invalid method specified.")
 
     final_password = technique_mapping[method]()
-    return {"result": cracker.get_progress(), "final_password": final_password}
+    if method.startswith("all"):
+        return {"result": final_password}
+    else:
+        return {"result": cracker.get_progress(), "final_password": final_password}
