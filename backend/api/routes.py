@@ -1,5 +1,5 @@
 # api/routes.py
-from flask import request, jsonify
+from flask import request
 from flask_restful import Resource
 from tasks.celery_tasks import crack_password_task
 
@@ -19,7 +19,7 @@ class SubmitHash(Resource):
         if not hash_value:
             return {'error': 'Hash value is required'}, 400
 
-        # Start the cracking task asynchronously
+        # Start the cracking task asynchronously via Celery
         task = crack_password_task.apply_async(args=[hash_value, hash_algorithm, method, extra_data])
         return {'task_id': task.id}, 202
 

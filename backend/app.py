@@ -10,7 +10,7 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Setup rate limiting (e.g., 200 per day and 50 per hour by default)
+    # Setup rate limiting (e.g., 200 per day and 50 per hour)
     limiter = Limiter(
         app,
         key_func=get_remote_address,
@@ -23,4 +23,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=app.config.get("DEBUG", False))
