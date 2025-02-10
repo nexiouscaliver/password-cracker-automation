@@ -10,10 +10,9 @@ WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt /app/
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy project
+# Copy project files
 COPY . /app/
 
 # Expose port 5000 for the Flask app
