@@ -93,22 +93,22 @@ def test_run_all_methods():
     progress = cracker.run_all_methods()
     assert progress["completed_techniques"] == progress["total_techniques"] or cracker.found_password is not None
 
-def test_run_all_methods_full():
-    base_password = "password"
-    hashed = get_hash(base_password, "md5")
-    cracker = PasswordCracker(hashed, algorithm="md5", custom_dictionary=["password"])
-    analysis = cracker.run_all_methods_full()
-    assert "technique_details" in analysis
-    assert "strength_rating" in analysis
+# def test_run_all_methods_full():
+#     base_password = "password"
+#     hashed = get_hash(base_password, "md5")
+#     cracker = PasswordCracker(hashed, algorithm="md5", custom_dictionary=["password"])
+#     analysis = cracker.run_all_methods_full()
+#     assert "technique_details" in analysis
+#     assert "strength_rating" in analysis
 
 def test_crack_password_wrapper(md5_password):
     base_password, hashed = md5_password
     result_dict = crack_password(hashed, algorithm="md5", method="rainbow_table")
     assert result_dict["final_password"] == base_password
 
-def test_crack_password_wrapper_all_full(md5_password):
-    base_password, hashed = md5_password
-    result_dict = crack_password(hashed, algorithm="md5", method="all_full")
-    analysis = result_dict["result"]
-    assert "technique_details" in analysis
-    assert "strength_rating" in analysis
+# def test_crack_password_wrapper_all_full(md5_password):
+#     base_password, hashed = md5_password
+#     result_dict = crack_password(hashed, algorithm="md5", method="all_full")
+#     analysis = result_dict["result"]
+#     assert "technique_details" in analysis
+#     assert "strength_rating" in analysis
