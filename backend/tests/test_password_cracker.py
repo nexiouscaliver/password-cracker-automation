@@ -15,7 +15,7 @@ def md5_password():
     return password, hashed
 
 def test_brute_force_attack():
-    # Use a short password for brute force to complete in reasonable time.
+    # Use a short password so brute force completes quickly.
     test_password = "abc"
     hashed = get_hash(test_password, "md5")
     cracker = PasswordCracker(hashed, algorithm="md5", max_length=3)
@@ -51,7 +51,7 @@ def test_rule_based_attack():
     assert result == mutated
 
 def test_mask_attack():
-    # For mask attack, monkey-patch hash_match to simulate a match.
+    # Monkey-patch hash_match to simulate a match.
     cracker = PasswordCracker("dummy", algorithm="md5")
     cracker.hash_match = lambda guess: guess == "A123"
     result = cracker.mask_attack()
@@ -83,14 +83,15 @@ def test_combinator_attack():
     hashed = get_hash(combinator, "md5")
     cracker = PasswordCracker(hashed, algorithm="md5", custom_dictionary=["admin"])
     result = cracker.combinator_attack()
-    # It could return any of "admin123", "admin1234", or "admin12345"
     assert result in ["admin123", "admin1234", "admin12345"]
 
 def test_run_all_methods():
     base_password = "password"
     hashed = get_hash(base_password, "md5")
+    # Use a custom dictionary so that dictionary_attack finds the password quickly.
     cracker = PasswordCracker(hashed, algorithm="md5", custom_dictionary=["password"])
     progress = cracker.run_all_methods()
+    # Even though several techniques are skipped, all 10 techniques complete.
     assert progress["completed_techniques"] == progress["total_techniques"]
 
 def test_crack_password_wrapper(md5_password):
