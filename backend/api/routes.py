@@ -13,13 +13,14 @@ class SubmitHash(Resource):
         data = request.get_json(force=True)
         hash_value = data.get('hash')
         hash_algorithm = data.get('hash_algorithm', 'md5')
-        method = data.get('method', 'dictionary')  # Options: 'brute_force', 'dictionary', 'rainbow'
+        method = data.get('method', 'dictionary_attack')
+        extra_data = data.get('extra_data', None)
         
         if not hash_value:
             return {'error': 'Hash value is required'}, 400
 
         # Start the cracking task asynchronously
-        task = crack_password_task.apply_async(args=[hash_value, hash_algorithm, method])
+        task = crack_password_task.apply_async(args=[hash_value, hash_algorithm, method, extra_data])
         return {'task_id': task.id}, 202
 
 class TaskStatus(Resource):
@@ -39,7 +40,6 @@ class TaskStatus(Resource):
                 'total': task_result.info.get('total', 1)
             }
         else:
-            # Something went wrong in the background job
             response = {
                 'state': task_result.state,
                 'status': str(task_result.info),
