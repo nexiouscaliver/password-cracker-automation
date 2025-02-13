@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useRouter } from "next/router"
-import { useProgress } from "@/context/ProgressContext"
-import { getProgress } from "@/utils/api"
+import { useProgress } from "../context/ProgressContext"
+import { getProgress } from "../utils/api"
 import { Badge } from "@/components/ui/badge"
 
 export default function Dashboard() {

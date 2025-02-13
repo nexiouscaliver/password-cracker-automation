@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import type React from "react" // Added import for React
+import type { JSX } from "react"
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,13 +12,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             Password Analyzer
           </Link>
           <div className="space-x-4">
-            <Button variant="ghost" asChild>
+            <Button asChild>
               <Link href="/">Home</Link>
             </Button>
-            <Button variant="ghost" asChild>
+            <Button asChild>
               <Link href="/submit-hash">Analyze</Link>
             </Button>
-            <Button variant="ghost" asChild>
+            <Button asChild>
               <Link href="/settings">Settings</Link>
             </Button>
           </div>
